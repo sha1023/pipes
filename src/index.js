@@ -366,10 +366,6 @@ const App = () => {
 
   const [elements, setElements, undo, redo] = useHistory([]);
   const [tools, setTools] = useState([src]);
-  const [action, setAction] = useState(null);
-  const [toolType, setToolType] = useState("line");
-  const [selected, setSelected] = useState(null);
-  const [meta, setMeta] = useState(null);
   const [highlightedTool, setHighlightedTool] = useState(src);
 
   useEffect(() => {
@@ -413,11 +409,10 @@ const App = () => {
     context.clearRect(0, 0, canvas.width, canvas.height);
 
     const roughCanvas = rough.canvas(canvas);
-    elements.forEach(({ roughElement }) => roughCanvas.draw(roughElement));
     tools.forEach((tool) => {
       tool.getElements().forEach((element) => roughCanvas.draw(element));
     });
-  }, [elements, tools]);
+  }, [tools]);
 
   //setTools([new Tool(25, 25)])
   const handlePointerDown = (event) => {
@@ -499,23 +494,7 @@ const App = () => {
 
   return (
     <div>
-      <div style={{ position: "fixed" }}>
-        Drawing app:
-        <input
-          type="radio"
-          id="select"
-          checked={toolType === "select"}
-          onChange={() => setToolType("select")}
-        />
-        <label htmlFor="select">Select</label>
-        <input
-          type="radio"
-          id="delete"
-          checked={toolType === "delete"}
-          onChange={() => setToolType("delete")}
-        />
-        <label htmlFor="delete">Delete</label>
-      </div>
+      <div style={{ position: "fixed" }}>Pipeline Visualization:</div>
 
       <div style={{ position: "fixed", bottom: 0, padding: 10 }}>
         <highlightedTool.config />
@@ -528,9 +507,7 @@ const App = () => {
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          /*style={{backgroundColor:'blue'}}/**/
         >
-          {" "}
           Canvas
         </canvas>
       </div>
