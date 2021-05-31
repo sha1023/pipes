@@ -111,11 +111,10 @@ class Cat extends Tool {
     this.text = text;
   }
   config() {
-    const text = "hello bworld"; //this.text;
     return (
       <input
         //onChange={this.text=text}
-        value={text}
+        value={this.text}
         type="text"
         required
       />
@@ -345,29 +344,27 @@ function cursorForPosition(x, y, anchor) {
 
 const linkPipeline = (tools) => {
   if (tools.length === 0) {
-    return;
+    return null;
   }
-  let src = null;
-  for (let i = 0; i < tools.length; i++) {
-    if (src) {
-      src.pipe(tools[i]);
-    }
-    src = tools[i];
-    src.setPosition(i);
+  const src = tools[0];
+  src.setPosition(0);
+  var upstream = src;
+  for (let i = src.position + 1; i < tools.length; i++) {
+    upstream.pipe(tools[i]);
+    upstream = tools[i];
   }
-  src.pipe(new Sink(1));
+  upstream.pipe(new Sink());
+  return src;
 };
 
 const App = () => {
-  const src = new Cat(
-    "hello\nworld\n It's been   real, but ultimately\n We all end up telling lies."
-  );
-  linkPipeline([src, new XArgs(1), new Grep(/l+/), new XArgs(null)]);
-
   const [elements, setElements, undo, redo] = useHistory([]);
-  const [tools, setTools] = useState([src]);
-  const [highlightedTool, setHighlightedTool] = useState(src);
+  const [pipeline, setPipeline] = useState([new Cat("hello\nworld\n It's been   real, but ultimately\n We all end up telling lies."), new XArgs(1), new Grep(/l+/), new XArgs(null)]);
+  const [highlightedTool, setHighlightedTool] = useState(0);
 
+  function ExposeConfig() {
+    return pipeline[highlightedTool].config();
+  }
   useEffect(() => {
     const undoRedoFunction = (event) => {
       if (
@@ -409,10 +406,9 @@ const App = () => {
     context.clearRect(0, 0, canvas.width, canvas.height);
 
     const roughCanvas = rough.canvas(canvas);
-    tools.forEach((tool) => {
-      tool.getElements().forEach((element) => roughCanvas.draw(element));
-    });
-  }, [tools]);
+    const src = linkPipeline(pipeline);
+    src.getElements().forEach((element) => roughCanvas.draw(element));
+  }, [pipeline]);
 
   //setTools([new Tool(25, 25)])
   const handlePointerDown = (event) => {
@@ -483,10 +479,10 @@ const App = () => {
   };
   const handlePointerUp = (event) => {
     const { clientX, clientY } = event;
-    const clickedTool = src.getToolAtPosition(clientX, clientY);
-    if (clickedTool) {
-      setHighlightedTool(clickedTool);
-    }
+    //const clickedTool = src.getToolAtPosition(clientX, clientY);
+    //if (clickedTool) {
+    //  setHighlightedTool(clickedTool);
+    //}
 
     //setAction(null);
     //setSelected(null);
@@ -497,7 +493,7 @@ const App = () => {
       <div style={{ position: "fixed" }}>Pipeline Visualization:</div>
 
       <div style={{ position: "fixed", bottom: 0, padding: 10 }}>
-        <highlightedTool.config />
+      <ExposeConfig />
       </div>
       <div>
         <canvas
