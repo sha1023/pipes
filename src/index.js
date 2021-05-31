@@ -42,24 +42,22 @@ const useHistory = (initialState) => {
 
 class Tool {
   constructor(color = null) {
-    //this.setPosition(position);
-    this.sink = null;
     this.color = color;
   }
   config() {
     return "undefined uggh";
   }
-  setPosition(position) {
-    this.position = position;
-    this.width = 20;
-    this.offset = 100;
-    this.minY = 100;
-    this.height = 250;
-    this.minX = this.position * this.width * 10 + this.offset;
+  apply(input) {
+    return [];
   }
-  pipe(sink) {
-    this.sink = sink;
-    this.sink.setPosition(this.position + 1);
+  computeDimensions(position) {
+    const width = 20;
+    const offset = 100;
+    const minY = 100;
+    const height = 250;
+    const minX = position * width * 10 + offset;
+    const sinkMinX = (position + 1) * width * 10 + offset;
+    return { minX, minY, width, height, sinkMinX };
   }
   computeColor(line) {
     const avgDarkness = Math.ceil(
@@ -76,30 +74,29 @@ class Tool {
     const hexDarkness = Number(avgDarkness).toString(16);
     return "#" + hexDarkness + hexDarkness + hexDarkness;
   }
-  getOutputLine(index, outputSpacing, line) {
+  getOutputLine(position, line, index, outputSpacing) {
+    const { minX, minY, width, height, sinkMinX } =
+      this.computeDimensions(position);
     this.computeColor(line);
-    const y = this.minY + (index + 1) * outputSpacing;
-    return generator.line(this.minX + this.width, y, this.sink.minX, y, {
+    const y = minY + (index + 1) * outputSpacing;
+    return generator.line(minX + width, y, sinkMinX, y, {
       strokeWidth: 5,
       stroke: this.computeColor(line),
     });
   }
-  getElements(lines = null) {
-    console.info(lines);
-
+  getElements(position, output) {
+    const { minX, minY, width, height, sinkMinX } =
+      this.computeDimensions(position);
     const elements = [
-      generator.rectangle(this.minX, this.minY, this.width, this.height, {
+      generator.rectangle(minX, minY, width, height, {
         fill: this.color,
       }),
     ];
-    if (this.sink) {
-      if (lines) {
-        const outputSpacing = Math.ceil(this.height / lines.length / 2);
-        lines.forEach((line, index) =>
-          elements.push(this.getOutputLine(index, outputSpacing, line))
-        );
-      }
-      elements.push(...this.sink.getElements(lines));
+    if (output) {
+      const outputSpacing = Math.ceil(height / output.length / 2);
+      output.forEach((line, index) =>
+        elements.push(this.getOutputLine(position, line, index, outputSpacing))
+      );
     }
     return elements;
   }
@@ -120,8 +117,11 @@ class Cat extends Tool {
       />
     );
   }
-  getElements() {
-    return super.getElements(this.text.split("\n"));
+  apply(input) {
+    if (input === null) {
+      input = this.text;
+    }
+    return input.split("\n");
   }
 }
 
@@ -130,19 +130,17 @@ class XArgs extends Tool {
     super("green");
     this.n = n;
   }
-  getElements(lines = null) {
+  apply(input) {
     const rebatchedLines = [];
-    if (lines) {
+    if (input) {
       const words = [];
-      lines.forEach((line) => words.push(...line.trim().split(/\s+/)));
-      console.log("words:", words);
+      input.forEach((line) => words.push(...line.trim().split(/\s+/)));
       const n = this.n ? this.n : words.length;
       for (let i = 0; i < words.length; i += n) {
         rebatchedLines.push(words.slice(i, i + n).join(" "));
       }
-      console.log("rebatchedLines", rebatchedLines);
     }
-    return super.getElements(rebatchedLines);
+    return rebatchedLines;
   }
 }
 
@@ -151,11 +149,8 @@ class Grep extends Tool {
     super("blue");
     this.regex = new RegExp(regex);
   }
-  getElements(lines = null) {
-    const filteredLines = lines
-      ? lines.filter((line) => this.regex.test(line))
-      : [];
-    return super.getElements(filteredLines);
+  apply(input) {
+    return input ? input.filter((line) => this.regex.test(line)) : [];
   }
 }
 
@@ -342,24 +337,17 @@ function cursorForPosition(x, y, anchor) {
   }
 }
 
-const linkPipeline = (tools) => {
-  if (tools.length === 0) {
-    return null;
-  }
-  const src = tools[0];
-  src.setPosition(0);
-  var upstream = src;
-  for (let i = src.position + 1; i < tools.length; i++) {
-    upstream.pipe(tools[i]);
-    upstream = tools[i];
-  }
-  upstream.pipe(new Sink());
-  return src;
-};
-
 const App = () => {
   const [elements, setElements, undo, redo] = useHistory([]);
-  const [pipeline, setPipeline] = useState([new Cat("hello\nworld\n It's been   real, but ultimately\n We all end up telling lies."), new XArgs(1), new Grep(/l+/), new XArgs(null)]);
+  const [pipeline, setPipeline] = useState([
+    new Cat(
+      "hello\nworld\n It's been   real, but ultimately\n We all end up telling lies."
+    ),
+    new XArgs(1),
+    new Grep(/l+/),
+    new XArgs(null),
+    new Sink(),
+  ]);
   const [highlightedTool, setHighlightedTool] = useState(0);
 
   function ExposeConfig() {
@@ -390,6 +378,12 @@ const App = () => {
     setElements(elementsCopy, true);
   };
 
+  const updatePipeline = (position, tool) => {
+    const pipelineCopy = [...pipeline];
+    pipelineCopy[position] = tool;
+    setPipeline(pipelineCopy);
+  };
+
   const deleteElement = (index) => {
     const elementsCopy = [...elements];
     elementsCopy.splice(index, 1);
@@ -406,11 +400,16 @@ const App = () => {
     context.clearRect(0, 0, canvas.width, canvas.height);
 
     const roughCanvas = rough.canvas(canvas);
-    const src = linkPipeline(pipeline);
-    src.getElements().forEach((element) => roughCanvas.draw(element));
+    let lines = null;
+    for (let i = 0; i < pipeline.length; i++) {
+      const tool = pipeline[i];
+      lines = tool.apply(lines);
+      tool
+        .getElements(i, lines)
+        .forEach((element) => roughCanvas.draw(element));
+    }
   }, [pipeline]);
 
-  //setTools([new Tool(25, 25)])
   const handlePointerDown = (event) => {
     //if (toolType === "select") {
     //  const element = getElementAtPosition(clientX, clientY, elements);
@@ -491,9 +490,28 @@ const App = () => {
   return (
     <div>
       <div style={{ position: "fixed" }}>Pipeline Visualization:</div>
-
       <div style={{ position: "fixed", bottom: 0, padding: 10 }}>
-      <ExposeConfig />
+        <ExposeConfig />
+        <button
+          onClick={() =>
+            updatePipeline(0, new Cat("holy crapoly, there's another bamoly!!"))
+          }
+        >
+          holy crapoly, there's another bamoly!!
+        </button>
+        <button
+          onClick={() =>
+            updatePipeline(
+              0,
+              new Cat(
+                "hello\nworld\n It's been   real, but ultimately\n We all end up telling lies."
+              )
+            )
+          }
+        >
+          hello\nworld\n It's been real, but ultimately\n We all end up telling
+          lies.
+        </button>
       </div>
       <div>
         <canvas
@@ -512,5 +530,3 @@ const App = () => {
 };
 
 ReactDOM.render(<App />, document.getElementById("root"));
-/*//<button onClick={undo}>Undo</button>
-        //<button onClick={redo}>Redo</button> //*/
