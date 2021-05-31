@@ -10,11 +10,10 @@ const generator = rough.generator();
 const closeDist = 10;
 const roughness = 0;
 const bowing = 0;
-const clearMeta = { roughness: roughness, bowing:bowing };
-const redMeta = { fill: "red", roughness: roughness, bowing:bowing };
-const blueMeta = { fill: "blue", roughness: roughness, bowing:bowing };
-const yellowMeta = { fill: "yellow", roughness: roughness, bowing:bowing };
-
+const clearMeta = { roughness: roughness, bowing: bowing };
+const redMeta = { fill: "red", roughness: roughness, bowing: bowing };
+const blueMeta = { fill: "blue", roughness: roughness, bowing: bowing };
+const yellowMeta = { fill: "yellow", roughness: roughness, bowing: bowing };
 
 const useHistory = (initialState) => {
   const [index, setIndex] = useState(0);
@@ -42,48 +41,63 @@ const useHistory = (initialState) => {
 };
 
 class Tool {
-  constructor(color=null) {
+  constructor(color = null) {
     //this.setPosition(position);
     this.sink = null;
     this.color = color;
   }
-  setPosition (position) {
+  config() {
+    return "undefined uggh";
+  }
+  setPosition(position) {
     this.position = position;
     this.width = 20;
-    this.offset =100;
+    this.offset = 100;
     this.minY = 100;
     this.height = 250;
-    this.minX = this.position*this.width*10+this.offset;
+    this.minX = this.position * this.width * 10 + this.offset;
   }
-  pipe(sink){
-    this.sink=sink;
-    this.sink.setPosition( this.position + 1);
+  pipe(sink) {
+    this.sink = sink;
+    this.sink.setPosition(this.position + 1);
   }
-  computeColor(line){
-    //line.split('').forEach(letter => console.log(letter, 'abcdefghijklmnopqrstuvwxyz'.indexOf(letter.toLowerCase())));
-    const avgDarkness = Math.ceil(line.split('').map(letter => Math.min(10*Math.max(letter.charCodeAt(0)- 'a'.charCodeAt(0), 0), 255)).reduce((a,b) => a+b)/line.length);
+  computeColor(line) {
+    const avgDarkness = Math.ceil(
+      line
+        .split("")
+        .map((letter) =>
+          Math.min(
+            10 * Math.max(letter.charCodeAt(0) - "a".charCodeAt(0), 0),
+            255
+          )
+        )
+        .reduce((a, b) => a + b) / line.length
+    );
     const hexDarkness = Number(avgDarkness).toString(16);
-    return '#' + hexDarkness + hexDarkness + hexDarkness;
+    return "#" + hexDarkness + hexDarkness + hexDarkness;
   }
-  getOutputLine(index, outputSpacing, line){
+  getOutputLine(index, outputSpacing, line) {
     this.computeColor(line);
-    const y = this.minY+(index+1)*outputSpacing;
-    return generator.line(this.minX + this.width, y, this.sink.minX, y, {strokeWidth: 5, stroke:this.computeColor(line)});
+    const y = this.minY + (index + 1) * outputSpacing;
+    return generator.line(this.minX + this.width, y, this.sink.minX, y, {
+      strokeWidth: 5,
+      stroke: this.computeColor(line),
+    });
   }
-  getElements(lines=null){
+  getElements(lines = null) {
     console.info(lines);
 
-    const elements = [generator.rectangle(
-      this.minX,
-      this.minY,
-      this.width,
-      this.height,
-      {fill: this.color}
-    )];
-    if(this.sink) {
-      if(lines){
-        const outputSpacing = Math.ceil(this.height/lines.length/2);
-        lines.forEach((line, index) => elements.push(this.getOutputLine(index, outputSpacing, line)));
+    const elements = [
+      generator.rectangle(this.minX, this.minY, this.width, this.height, {
+        fill: this.color,
+      }),
+    ];
+    if (this.sink) {
+      if (lines) {
+        const outputSpacing = Math.ceil(this.height / lines.length / 2);
+        lines.forEach((line, index) =>
+          elements.push(this.getOutputLine(index, outputSpacing, line))
+        );
       }
       elements.push(...this.sink.getElements(lines));
     }
@@ -92,54 +106,65 @@ class Tool {
 }
 
 class Cat extends Tool {
-  constructor(text){
-    super('purple');
+  constructor(text) {
+    super("purple");
     this.text = text;
   }
-  getElements(){
+  config() {
+    const text = "hello bworld"; //this.text;
+    return (
+      <input
+        //onChange={this.text=text}
+        value={text}
+        type="text"
+        required
+      />
+    );
+  }
+  getElements() {
     return super.getElements(this.text.split("\n"));
   }
 }
 
 class XArgs extends Tool {
-  constructor(n=null){
-    super('green');
+  constructor(n = null) {
+    super("green");
     this.n = n;
   }
-  getElements(lines=null) {
+  getElements(lines = null) {
     const rebatchedLines = [];
-    if(lines) {
+    if (lines) {
       const words = [];
-      lines.forEach(line => words.push(...line.trim().split(/\s+/)));
-      console.log('words:',words);
-      const n = this.n? this.n: words.length;
-      for (let i=0; i< words.length; i+= n) {
-        rebatchedLines.push(words.slice(i, i+n).join(" "));
+      lines.forEach((line) => words.push(...line.trim().split(/\s+/)));
+      console.log("words:", words);
+      const n = this.n ? this.n : words.length;
+      for (let i = 0; i < words.length; i += n) {
+        rebatchedLines.push(words.slice(i, i + n).join(" "));
       }
-      console.log('rebatchedLines', rebatchedLines);
+      console.log("rebatchedLines", rebatchedLines);
     }
     return super.getElements(rebatchedLines);
   }
 }
 
 class Grep extends Tool {
-  constructor(regex){
-    super('blue');
+  constructor(regex) {
+    super("blue");
     this.regex = new RegExp(regex);
   }
-  getElements(lines=null) {
-    const filteredLines =  lines? lines.filter(line => this.regex.test(line)):[];
+  getElements(lines = null) {
+    const filteredLines = lines
+      ? lines.filter((line) => this.regex.test(line))
+      : [];
     return super.getElements(filteredLines);
   }
-
 }
 
 class Sink extends Tool {
-  constructor(){
+  constructor() {
     super(null);
   }
 }
-
 
 class Element {
   constructor(index, klass, x1, y1, x2, y2, meta) {
@@ -319,22 +344,24 @@ function cursorForPosition(x, y, anchor) {
 }
 
 const linkPipeline = (tools) => {
-  if(tools.length === 0) {
+  if (tools.length === 0) {
     return;
   }
   let src = null;
-  for(let i=0; i<tools.length;i++){
-    if(src) {
+  for (let i = 0; i < tools.length; i++) {
+    if (src) {
       src.pipe(tools[i]);
     }
     src = tools[i];
     src.setPosition(i);
   }
-  src.pipe(new Sink(1 ));
+  src.pipe(new Sink(1));
 };
 
 const App = () => {
-  const src = new Cat("hello\nworld\n It's been   real, but ultimately\n We all end up telling lies.");
+  const src = new Cat(
+    "hello\nworld\n It's been   real, but ultimately\n We all end up telling lies."
+  );
   linkPipeline([src, new XArgs(1), new Grep(/l+/), new XArgs(null)]);
 
   const [elements, setElements, undo, redo] = useHistory([]);
@@ -343,6 +370,7 @@ const App = () => {
   const [toolType, setToolType] = useState("line");
   const [selected, setSelected] = useState(null);
   const [meta, setMeta] = useState(null);
+  const [highlightedTool, setHighlightedTool] = useState(src);
 
   useEffect(() => {
     const undoRedoFunction = (event) => {
@@ -386,17 +414,17 @@ const App = () => {
 
     const roughCanvas = rough.canvas(canvas);
     elements.forEach(({ roughElement }) => roughCanvas.draw(roughElement));
-    tools.forEach(tool => {tool.getElements().forEach(element => roughCanvas.draw(element))});
+    tools.forEach((tool) => {
+      tool.getElements().forEach((element) => roughCanvas.draw(element));
+    });
   }, [elements, tools]);
 
- //setTools([new Tool(25, 25)])
+  //setTools([new Tool(25, 25)])
   const handlePointerDown = (event) => {
-    //const { clientX, clientY } = event;
     //if (toolType === "select") {
     //  const element = getElementAtPosition(clientX, clientY, elements);
     //  if (element) {
     //    setElements((prevState) => prevState);
-
     //    if (element.anchor === "inside") {
     //      setAction("moving");
     //    } else {
@@ -434,7 +462,6 @@ const App = () => {
     //const { clientX, clientY } = event;
     //if (toolType === "select") {
     //  const element = getElementAtPosition(clientX, clientY, elements);
-
     //  event.target.style.cursor = element
     //    ? cursorForPosition(clientX, clientY, element.anchor)
     //    : "default";
@@ -452,7 +479,6 @@ const App = () => {
     //  updateElement(resizedElement);
     //} else if (toolType === "delete") {
     //  const element = getElementAtPosition(clientX, clientY, elements);
-
     //  event.target.style.cursor = element ? "not-allowed" : "default";
     //} else if (action === "drawing") {
     //  const { index } = selected;
@@ -461,6 +487,12 @@ const App = () => {
     //}
   };
   const handlePointerUp = (event) => {
+    const { clientX, clientY } = event;
+    const clickedTool = src.getToolAtPosition(clientX, clientY);
+    if (clickedTool) {
+      setHighlightedTool(clickedTool);
+    }
+
     //setAction(null);
     //setSelected(null);
   };
@@ -486,34 +518,7 @@ const App = () => {
       </div>
 
       <div style={{ position: "fixed", bottom: 0, padding: 10 }}>
-        <input
-          type="radio"
-          id="clear"
-          checked={meta === clearMeta}
-          onChange={() => setMeta(clearMeta)}
-        />
-        <label htmlFor="Clear">Clear</label>
-        <input
-          type="radio"
-          id="red"
-          checked={meta === redMeta}
-          onChange={() => setMeta(redMeta)}
-        />
-        <label htmlFor="red">Red</label>
-        <input
-          type="radio"
-          id="blue"
-          checked={meta === blueMeta}
-          onChange={() => setMeta(blueMeta)}
-        />
-        <label htmlFor="blue">Blue</label>
-        <input
-          type="radio"
-          id="yellow"
-          checked={meta === yellowMeta}
-          onChange={() => setMeta(yellowMeta)}
-        />
-        <label htmlFor="yellow">Yellow</label>
+        <highlightedTool.config />
       </div>
       <div>
         <canvas
