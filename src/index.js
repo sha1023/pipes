@@ -1,6 +1,5 @@
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import ReactDOM from "react-dom";
-//import './index.css';
 
 import rough from "roughjs/bundled/rough.esm";
 
@@ -44,9 +43,6 @@ class Tool {
   constructor(color = null) {
     this.color = color;
   }
-  config() {
-    return "undefined uggh";
-  }
   apply(input) {
     return [];
   }
@@ -60,6 +56,9 @@ class Tool {
     return { minX, minY, width, height, sinkMinX };
   }
   computeColor(line) {
+    if (!line) {
+      return "#000000";
+    }
     const avgDarkness = Math.ceil(
       line
         .split("")
@@ -106,16 +105,6 @@ class Cat extends Tool {
   constructor(text) {
     super("purple");
     this.text = text;
-  }
-  config() {
-    return (
-      <input
-        //onChange={this.text=text}
-        value={this.text}
-        type="text"
-        required
-      />
-    );
   }
   apply(input) {
     if (input === null) {
@@ -350,9 +339,6 @@ const App = () => {
   ]);
   const [highlightedTool, setHighlightedTool] = useState(0);
 
-  function ExposeConfig() {
-    return pipeline[highlightedTool].config();
-  }
   useEffect(() => {
     const undoRedoFunction = (event) => {
       if (
@@ -490,27 +476,14 @@ const App = () => {
   return (
     <div>
       <div style={{ position: "fixed" }}>Pipeline Visualization:</div>
-      <div style={{ position: "fixed", bottom: 0, padding: 10 }}>
-        <ExposeConfig />
+      <div style={{ position: "fixed", bottom: 0, padding: 100 }}>
+        <textarea id="catText" placeholder={pipeline[0].text} required />
         <button
           onClick={() =>
-            updatePipeline(0, new Cat("holy crapoly, there's another bamoly!!"))
+            updatePipeline(0, new Cat(document.getElementById("catText").value))
           }
         >
-          holy crapoly, there's another bamoly!!
-        </button>
-        <button
-          onClick={() =>
-            updatePipeline(
-              0,
-              new Cat(
-                "hello\nworld\n It's been   real, but ultimately\n We all end up telling lies."
-              )
-            )
-          }
-        >
-          hello\nworld\n It's been real, but ultimately\n We all end up telling
-          lies.
+          Update Source
         </button>
       </div>
       <div>
