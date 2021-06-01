@@ -43,17 +43,28 @@ class Tool {
   constructor(color = null) {
     this.color = color;
   }
+  config(callback) {
+    return "no config for this tool";
+  }
   apply(input) {
     return [];
   }
   computeDimensions(position) {
-    const width = 20;
+    const width = 50;
     const offset = 100;
     const minY = 100;
     const height = 250;
-    const minX = position * width * 10 + offset;
-    const sinkMinX = (position + 1) * width * 10 + offset;
-    return { minX, minY, width, height, sinkMinX };
+    const minX = position * width * 4 + offset;
+    const maxX = minX + width;
+    const maxY = minY + height;
+    const sinkMinX = (position + 1) * width * 4 + offset;
+    return { minX, minY, width, height, sinkMinX, maxX, maxY };
+  }
+  isInside(position, clientX, clientY) {
+    const { minX, minY, maxX, maxY } = this.computeDimensions(position);
+    return (
+      clientX >= minX && clientX <= maxX && clientY >= minY && clientY <= maxY
+    );
   }
   computeColor(line) {
     if (!line) {
@@ -83,12 +94,13 @@ class Tool {
       stroke: this.computeColor(line),
     });
   }
-  getElements(position, output) {
+  getElements(position, output, highlight = false) {
     const { minX, minY, width, height, sinkMinX } =
       this.computeDimensions(position);
     const elements = [
       generator.rectangle(minX, minY, width, height, {
         fill: this.color,
+        strokeWidth: highlight ? 5 : 1,
       }),
     ];
     if (output) {
@@ -106,6 +118,20 @@ class Cat extends Tool {
     super("purple");
     this.text = text;
   }
+  config(callback) {
+    return (
+      <div>
+        <textarea id="toolConfig" placeholder={this.text} required />
+        <button
+          onClick={() =>
+            callback(new Cat(document.getElementById("toolConfig").value))
+          }
+        >
+          Update Cat
+        </button>
+      </div>
+    );
+  }
   apply(input) {
     if (input === null) {
       input = this.text;
@@ -118,6 +144,26 @@ class XArgs extends Tool {
   constructor(n = null) {
     super("green");
     this.n = n;
+  }
+  config(callback) {
+    return (
+      <div>
+        <input
+          type="number"
+          min="1"
+          id="toolConfig"
+          placeholder={this.n}
+          required
+        />
+        <button
+          onClick={() =>
+            callback(new XArgs(document.getElementById("toolConfig").value))
+          }
+        >
+          Update XArgs
+        </button>
+      </div>
+    );
   }
   apply(input) {
     const rebatchedLines = [];
@@ -137,6 +183,20 @@ class Grep extends Tool {
   constructor(regex) {
     super("blue");
     this.regex = new RegExp(regex);
+  }
+  config(callback) {
+    return (
+      <div>
+        <input type="text" id="toolConfig" placeholder={this.regex} required />
+        <button
+          onClick={() =>
+            callback(new Grep(document.getElementById("toolConfig").value))
+          }
+        >
+          Update Grep
+        </button>
+      </div>
+    );
   }
   apply(input) {
     return input ? input.filter((line) => this.regex.test(line)) : [];
@@ -332,9 +392,9 @@ const App = () => {
     new Cat(
       "hello\nworld\n It's been   real, but ultimately\n We all end up telling lies."
     ),
-    new XArgs(1),
+    new XArgs(5),
     new Grep(/l+/),
-    new XArgs(null),
+    new XArgs(1),
     new Sink(),
   ]);
   const [highlightedTool, setHighlightedTool] = useState(0);
@@ -391,10 +451,10 @@ const App = () => {
       const tool = pipeline[i];
       lines = tool.apply(lines);
       tool
-        .getElements(i, lines)
+        .getElements(i, lines, highlightedTool === i ? true : false)
         .forEach((element) => roughCanvas.draw(element));
     }
-  }, [pipeline]);
+  }, [pipeline, highlightedTool]);
 
   const handlePointerDown = (event) => {
     //if (toolType === "select") {
@@ -464,6 +524,16 @@ const App = () => {
   };
   const handlePointerUp = (event) => {
     const { clientX, clientY } = event;
+    for (let i = 0; i < pipeline.length; i++) {
+      console.log(
+        "pipeline[i].isInside(i)",
+        i,
+        pipeline[i].isInside(i, clientX, clientY)
+      );
+      if (pipeline[i].isInside(i, clientX, clientY)) {
+        setHighlightedTool(i);
+      }
+    }
     //const clickedTool = src.getToolAtPosition(clientX, clientY);
     //if (clickedTool) {
     //  setHighlightedTool(clickedTool);
@@ -477,14 +547,9 @@ const App = () => {
     <div>
       <div style={{ position: "fixed" }}>Pipeline Visualization:</div>
       <div style={{ position: "fixed", bottom: 0, padding: 100 }}>
-        <textarea id="catText" placeholder={pipeline[0].text} required />
-        <button
-          onClick={() =>
-            updatePipeline(0, new Cat(document.getElementById("catText").value))
-          }
-        >
-          Update Source
-        </button>
+        {pipeline[highlightedTool].config((tool) =>
+          updatePipeline(highlightedTool, tool)
+        )}
       </div>
       <div>
         <canvas
