@@ -157,7 +157,9 @@ class XArgs extends Tool {
         />
         <button
           onClick={() =>
-            callback(new XArgs(document.getElementById("toolConfig").value))
+            callback(
+              new XArgs(parseInt(document.getElementById("toolConfig").value))
+            )
           }
         >
           Update XArgs
@@ -387,17 +389,19 @@ function cursorForPosition(x, y, anchor) {
 }
 
 const App = () => {
+  const defaultInput =
+    "ONCE when I saw a cripple\nGasping slowly his last days with the white plague,\nLooking from hollow eyes, calling for air,\nDesperately gesturing with wasted hands\nIn the dark and dust of a house down in a slum,\nI said to myself\nI would rather have been a tall sunflower\nLiving in a country garden\nLifting a golden-brown face to the summer,\nRain-washed and dew-misted,\nMixed with the poppies and ranking hollyhocks,\nAnd wonderingly watching night after night\nThe clear silent processionals of stars.";
   const [elements, setElements, undo, redo] = useHistory([]);
   const [pipeline, setPipeline] = useState([
-    new Cat(
-      "hello\nworld\n It's been   real, but ultimately\n We all end up telling lies."
-    ),
-    new XArgs(5),
-    new Grep(/l+/),
-    new XArgs(1),
+    new Cat(defaultInput),
+    new XArgs(15),
+    new Grep(","),
+    new XArgs(6),
     new Sink(),
   ]);
   const [highlightedTool, setHighlightedTool] = useState(0);
+  const [inputLines, setInputLines] = useState([]);
+  const [outputLines, setOutputLines] = useState(defaultInput.split("\n"));
 
   useEffect(() => {
     const undoRedoFunction = (event) => {
@@ -447,12 +451,22 @@ const App = () => {
 
     const roughCanvas = rough.canvas(canvas);
     let lines = null;
+    if (highlightedTool === 0) {
+      setInputLines([]);
+    } else if (highlightedTool === pipeline.length) {
+      setOutputLines([]);
+    }
     for (let i = 0; i < pipeline.length; i++) {
       const tool = pipeline[i];
       lines = tool.apply(lines);
       tool
         .getElements(i, lines, highlightedTool === i ? true : false)
         .forEach((element) => roughCanvas.draw(element));
+      if (i === highlightedTool - 1) {
+        setInputLines(lines);
+      } else if (i === highlightedTool) {
+        setOutputLines(lines);
+      }
     }
   }, [pipeline, highlightedTool]);
 
@@ -525,11 +539,6 @@ const App = () => {
   const handlePointerUp = (event) => {
     const { clientX, clientY } = event;
     for (let i = 0; i < pipeline.length; i++) {
-      console.log(
-        "pipeline[i].isInside(i)",
-        i,
-        pipeline[i].isInside(i, clientX, clientY)
-      );
       if (pipeline[i].isInside(i, clientX, clientY)) {
         setHighlightedTool(i);
       }
@@ -550,6 +559,23 @@ const App = () => {
         {pipeline[highlightedTool].config((tool) =>
           updatePipeline(highlightedTool, tool)
         )}
+
+        <div style={{ float: "left" }}>
+          input lines
+          <ul>
+            {inputLines.map((item) => (
+              <li>{item}</li>
+            ))}
+          </ul>
+        </div>
+        <div style={{ float: "right" }}>
+          output lines
+          <ul>
+            {outputLines.map((item) => (
+              <li>{item}</li>
+            ))}
+          </ul>
+        </div>
       </div>
       <div>
         <canvas
